@@ -1091,11 +1091,10 @@
 	$.ajax( {
 		url: masterPlist || 'Replica.plist'
 	} ).success( function (xml) {
-		// parse the background-image-file-name key to determine orientation
-		$(xml).find('key').each(function (index, page) {
+		// find and parse the background-image-file-name key to determine orientation
+		$(xml).find('dict').children().each(function (index, page) {
 			if( page.textContent == 'background-image-file-name' ) {
-				var bg_image = $(xml).find('string');
-				var pieces = bg_image[index].textContent.split('_');
+				var pieces = $(this).next().text().split('_');
 				orientation = pieces.pop();
 				// pages array
 				$(xml).find('array').find('string').each( function (index, page) {
