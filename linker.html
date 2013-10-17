@@ -118,6 +118,8 @@
 	var n_scrollable = 0;
 
 	var pages = [];
+	var currentImg;
+	var orientation;
 	var mouseX = -1;
 	var mouseY = -1;
 	var linking;
@@ -228,24 +230,40 @@
 	} ).click( function (e) { e.stopPropagation() } );
 
 	$('#prev').click( function (e) {
-		var n = filename.match( /(\d+)\.jpg/ )[1];
-		if ( n > 0 ) {
-			filename = filename.replace( /\d+\.jpg/, Number(n) - 1 + '.jpg' );
-			update_image();
+		currentImg--;
+		if( currentImg < 0 ) {
+			currentImg = pages.length - 1;
 		}
+		filename = pages[currentImg];
+		update_image();
 		return false;
 	} );
 
 	$('#next').click( function (e) {
-		var n = filename.match( /(\d+)\.jpg/ )[1];
-		filename = filename.replace( /\d+\.jpg/, Number(n) + 1 + '.jpg' );
+		currentImg++;
+		if( currentImg >= pages.length ) {
+			currentImg = 0;
+		}
+		filename = pages[currentImg];
 		update_image();
 		return false;
 	} );
 
 	$('#goToImg').keydown( function (e) {
 		if ( e.which == 13 ) {
-			filename = filename.replace( /\d+\.jpg/, $('#goToImg').val() + '.jpg' );
+			var goToImg = $(this).val();
+			var lastPage = pages.length-1;
+			
+			if( goToImg > lastPage ) {
+				goToImg = lastPage;
+				$(this).val( goToImg );
+				alert('Page out of range. Setting to end page ' + lastPage);
+			} else if( goToImg < 0 ) {
+				goToImg = 0;
+				$(this).val(goToImg);
+				alert('Negative value entered. Going to first page.')
+			}
+			filename = pages[goToImg];
 			update_image();
 			return false;
 		}
@@ -469,6 +487,8 @@
 	function update_image () {
 		$('#notification').text('');
 		localStorage.setItem( reqURL + '.page_filename', filename );
+		currentImg = $.inArray(filename, pages);
+		$('#goToImg').val(currentImg);
 
 		var sizer = forceSizer || sizers[ filename.substr(0,3) ];
 		sizer(bg);
@@ -508,11 +528,11 @@
 
 		//number of hotspot
 		var n_hotspot = 0;
-
+		
 		//number of scrollable
-
-
-		var plistname = pages[filename.match( /(\d+)\.jpg/ )[1] - 1 + pageOffset] + '.plist';
+		var search = '_' + orientation + '.jpg';
+		var plistname = filename.replace( search, '.plist' );
+		
 		$('#filename', ld).text( plistname );
 		$.ajax( {
 			url: plistname,
@@ -521,8 +541,7 @@
 		} ).success( function (xml) {
 			n_links = 0;
 			plist_xml = xml;
-
-			//dict_array_xml = $(xml).find('array');
+			
 			dict_array_xml = $('plist > dict > array', xml);
 			dict_array_xml.children().each( function () {
 				var dims, url;
@@ -744,9 +763,6 @@
 							}
 					}
 				} );
-				//if (isHotPot) {
-					//hotpotObject.push($(this)[0]);
-				//}
 			} );
 
 		if(isHotPot) {
@@ -1075,12 +1091,21 @@
 	$.ajax( {
 		url: masterPlist || 'Replica.plist'
 	} ).success( function (xml) {
-		$(xml).find('array').find('string').each( function (index, page) {
-			pages.push( page.textContent );
+		// parse the background-image-file-name key to determine orientation
+		$(xml).find('key').each(function (index, page) {
+			if( page.textContent == 'background-image-file-name' ) {
+				var bg_image = $(xml).find('string');
+				var pieces = bg_image[index].textContent.split('_');
+				orientation = pieces.pop();
+				// pages array
+				$(xml).find('array').find('string').each( function (index, page) {
+					var page_image = page.textContent + '_' + orientation + '.jpg';
+					pages.push( page_image );
+				} );
+				filename = localStorage.getItem( reqURL + '.page_filename' ) || pages[0];
+				update_image();
+			};
 		} );
-		filename = localStorage.getItem( reqURL + '.page_filename' ) ||
-			pages[0].replace( /\d+$/, 0) + '.jpg';
-		update_image();
 	} ).error( function () {
 		alert( 'No master plist found. Please put this file in the issue directory.')
 	} );
